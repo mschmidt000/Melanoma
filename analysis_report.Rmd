@@ -1,0 +1,35 @@
+---
+title: "Analysis report of melanoma scRNA-Seq data"
+author: "Maria Schmidt"
+affiliation: "IZBI, Interdisciplinary Centre for Bioinformatics, Leipzig University, Germany"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    number_sections: false
+bibliography: "my_collection.bib"
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(Seurat)
+library(tidyverse)
+library(scales)
+
+load("")
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

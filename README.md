@@ -1,0 +1,1 @@
+This project folder contains the data and analysis of scRNA-Seq melanoma data of 10 tumors and 1 nevus.
