@@ -15,23 +15,21 @@ liana_obj <- liana_obj %>%
   liana_aggregate()
 save(liana_obj, file = filename)
 
-plot_lymphs_vs_mels( liana_obj, obj_naevus_neg, "integrated")
+plot_lymphs_vs_mels(liana_obj, obj_naevus_neg, "integrated")
 
 Idents(obj_integr) <- "orig.ident"
 
-sapply(levels(Idents(obj_integr)), function(x){
-  
+sapply(levels(Idents(obj_integr)), function(x) {
   obj_subset <- subset(obj_integr, idents = x)
   obj_subset <- ScaleData(obj_subset, verbose = FALSE, features = rownames(obj_subset)) %>%
-    RunPCA(npcs = n_dims_use, verbose = FALSE) 
-  
+    RunPCA(npcs = n_dims_use, verbose = FALSE)
+
   liana_obj <- liana_wrap(obj_subset, assay = "RNA")
   filename <- here(output_data_path, paste0(x, "-liana-obj.RData"))
   save(liana_obj, file = filename)
   liana_obj <- liana_obj %>%
     liana_aggregate()
   save(liana_obj, file = filename)
-  
-  plot_lymphs_vs_mels( liana_obj, obj_subset, x)
-  
+
+  plot_lymphs_vs_mels(liana_obj, obj_subset, x)
 })
