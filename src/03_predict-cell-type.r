@@ -1,9 +1,12 @@
 ### predict cell types with data set from reynolds 2021
 ### 20.05.22
 
-literature_path <- "literature"
-filename <- file.path(literature_path, "Reynolds2021_Data-all_seuratObj.RData")
+cell_type_to_exclude <- "Schwann"
+
+filename <- here(literature_path, "Reynolds2021_Data-all_seuratObj.RData")
 load(filename)
+Idents(seurObj) <- "Cell_type"
+seurObj <- subset(seurObj, idents = cell_type_to_exclude, invert = TRUE)
 
 reynolds_predictions_exact <- list()
 
@@ -29,38 +32,39 @@ for(i in seq_along(runs_list)){
 }
 
 
-save(reynolds_predictions_exact, file = file.path(output_data_path,"reynolds_predictions_exact.RData"))
+save(reynolds_predictions_exact, file = here(output_data_path,"reynolds-predictions-exact.RData"))
 rm(reynolds_predictions_exact)
 rm(seurObj)
 
 for(i in seq_along(runs_list)){
-  seuratObj <- runs_list[[runs[i]]]
-  filename <- file.path(output_data_path,paste0(runs[i], "_seuratObj.RData"))
-  save(seuratObj, file = filename)
+  seurat_obj <- runs_list[[runs[i]]]
+  filename <- here(output_data_path,paste0(runs[i], "_seurat-obj.RData"))
+  save(seurat_obj, file = filename)
 }
-rm(seuratObj)
+rm(seurat_obj)
 
 
 interesting_idents_long <- c("predicted.id.Cell_type", "predicted.id.Cell_group", "predicted.id.Flow_gate" )
 interesting_idents_short <- c("Reynolds 2021 Cell-Type", "Reynolds 2021 Cell-Group", "Reynolds 2021 Flow Gate")
 
-filename <- file.path(figures_path, "Cell-type predictions.pdf")
+
+filename <- here(figures_path, "03-cell-type-predictions.pdf")
 pdf(filename, height = 7, width = 14)
 
 for(a in seq_along(runs_list)){
   
-  seurObj <- runs_list[[runs[a]]]
+  seurat_obj <- runs_list[[runs[a]]]
   for(i in seq_along(interesting_idents_long)){
     
       plot(0, type="n", axes=FALSE, xlab="", ylab="", xlim=c(0,1))
       mtext(names(runs_list)[a], side=3, line = -2, cex=3, at=-0.04, font=3,adj=0)
       my_title <- paste0("UMAP colored by ", interesting_idents_short[i], " (",names(runs_list)[a],")" )
-      my_palette <- pals::polychrome(length(unique(seurObj@meta.data[, interesting_idents_long[i]])))
-      names(my_palette) <- sort(unique(seurObj@meta.data[, interesting_idents_long[i]]))
-      print(DimPlot(seurObj, reduction = "umap", label = TRUE, group.by = interesting_idents_long[i], pt.size = 1, repel = TRUE) + ggtitle(my_title))
+      my_palette <- pals::polychrome(length(unique(seurat_obj@meta.data[, interesting_idents_long[i]])))
+      names(my_palette) <- sort(unique(seurat_obj@meta.data[, interesting_idents_long[i]]))
+      print(DimPlot(seurat_obj, reduction = "umap", label = TRUE, cols = my_palette, group.by = interesting_idents_long[i], pt.size = 1, repel = TRUE) + ggtitle(my_title))
       par(mar=c(10,5,4,5))
       my_title <- paste0("Number of Cells per Cluster (", interesting_idents_short[i], ", ",names(runs_list)[a],")" )
-      print(barplot(table(seurObj@meta.data[, interesting_idents_long[i]]), las=2, main = my_title, col = my_palette[names(table(seurObj@meta.data[, interesting_idents_long[i]]))]))
+      print(barplot(table(seurat_obj@meta.data[, interesting_idents_long[i]]), las=2, main = my_title, col = my_palette[names(table(seurat_obj@meta.data[, interesting_idents_long[i]]))]))
   
     }
 }

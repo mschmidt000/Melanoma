@@ -1,14 +1,15 @@
 ### load data and preprocess with seurat
 ### 19.05.22
 
-library(Seurat)
-library(tidyverse)
+pacman::p_load(Seurat, tidyverse)
 
 runs <- c( "s1_LE479_NM_T", "LE489KG_Rep", "LE493BR_Rep", "LE497NA_Rep", "LE497ST_Rep", "LE-501-DM_Rep", "LE-517-LD",
            "LE-511-MW", "LE_569_HH", "LE_577_WR", "LE_579_DE", "LE-583-KM", "LE-585-HM" )
 input_data_path <- file.path("data")
 output_data_path <- file.path("output")
 figures_path <- file.path("figs")
+literature_path <- "literature"
+
 paths <- list.dirs(input_data_path, full.names = FALSE)[-which(list.dirs(input_data_path, full.names = FALSE) %in% "")]
 
 
@@ -18,17 +19,17 @@ filtering_cutoff_list <- list()
 for(i in seq_along(runs)){
   runs_list[[runs[i]]] <- list()
   runs_list[[runs[i]]] <- ReadMtx(
-    mtx = file.path(input_data_path, paths[i], "matrix.mtx.gz"), features = file.path(input_data_path, paths[i], "features.tsv.gz"),
-    cells = file.path(input_data_path, paths[i], "barcodes.tsv.gz")
+    mtx = here(input_data_path, paths[i], "matrix.mtx.gz"), features = here(input_data_path, paths[i], "features.tsv.gz"),
+    cells = here(input_data_path, paths[i], "barcodes.tsv.gz")
   )
-  colnames(runs_list[[runs[i]]]) <- paste( runs[a], colnames(runs_list[[runs[i]]]), sep = "_")
+  colnames(runs_list[[runs[i]]]) <- paste( runs[i], colnames(runs_list[[runs[i]]]), sep = "_")
   runs_list[[runs[i]]] <- CreateSeuratObject(counts = as.matrix(runs_list[[runs[i]]]), min.cells = 1, min.features = 1)
   runs_list[[runs[i]]][["percent.mt"]] <- PercentageFeatureSet(runs_list[[runs[i]]], pattern = "^MT-")
   runs_list[[runs[i]]][["percent.rps"]] <- PercentageFeatureSet(runs_list[[runs[i]]], pattern = "^RPS")
-  runs_list[[runs[i]]]@meta.data$orig.ident <- names(runs)[i]
+  runs_list[[runs[i]]]@meta.data$orig.ident <- runs[i]
 }
 
-filename <- file.path(figures_path, "Quality Check.pdf")
+filename <- here(figures_path, "01_quality-check.pdf")
 pdf(filename, 29.7/2.54, 21/2.54, useDingbats=FALSE)
 for(i in seq_along(runs_list)){
   plot(0, type="n", axes=FALSE, xlab="", ylab="", xlim=c(0,1))
@@ -45,7 +46,7 @@ for(i in seq_along(runs_list)){
 }
 dev.off()
 
-filename <- file.path(figures_path, "Filtered Quality Check.pdf")
+filename <- here(figures_path, "01_filtered-quality-check.pdf")
 pdf(filename, 29.7/2.54, 21/2.54, useDingbats=FALSE)
 for(i in seq_along(runs_list)){
   filtering_cutoff_list[[runs[i]]] <- c("min_nCount_RNA" = quantile(runs_list[[runs[i]]]$nCount_RNA, 0.25),  
@@ -79,7 +80,7 @@ for(i in seq_along(runs_list)){
 }
 dev.off()
 
-filename <- file.path(figures_path, "Top 10 variable features.pdf")
+filename <- here(figures_path, "01_top-10-variable-features.pdf")
 pdf(filename, 29.7/2.54, 21/2.54, useDingbats=FALSE)
 
 for(i in seq_along(runs_list)){
@@ -94,8 +95,8 @@ for(i in seq_along(runs_list)){
 dev.off()
 
 for(i in seq_along(runs_list)){
-  seuratObj <- runs_list[[runs[i]]]
-  filename <- file.path(output_data_path,paste0(runs[i], "_seuratObj.RData"))
-  save(seuratObj, file = filename)
+  seurat_obj <- runs_list[[runs[i]]]
+  filename <- here(output_data_path,paste0(runs[i], "_seurat-obj.RData"))
+  save(seurat_obj, file = filename)
 }
-rm(seuratObj)
+rm(seurat_obj)

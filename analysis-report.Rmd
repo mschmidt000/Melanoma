@@ -1,0 +1,112 @@
+---
+title: "Analysis report of melanoma scRNA-Seq data"
+author: "Maria Schmidt"
+affiliation: "IZBI, Interdisciplinary Centre for Bioinformatics, Leipzig University, Germany"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    number_sections: false
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r libraries and load data}
+library(Seurat)
+library(tidyverse)
+library(ggplot2)
+library(pals)
+
+output_data_path <- file.path("output")
+
+filename <- file.path(output_data_path, "integrated_seuratObj.RData")
+load(filename)
+filename <- file.path(output_data_path, "color_list.RData")
+load(filename)   
+seurat_colors <- scales::hue_pal()(length(table(obj_integr@meta.data[, "seurat_clusters"])))
+seurat_cluster_data <- data.frame(
+    table(obj_integr@meta.data[, "seurat_clusters"]),
+    "color" = seurat_colors
+)
+celltype_colors <- color_list[["predicted.id.Cell_type"]]
+celltype_cluster_data <- data.frame(
+    table(obj_integr@meta.data[, "predicted.id.Cell_type"]),
+    "color" = celltype_colors
+)
+
+```
+
+## Preprocessing and Quality Check
+
+We checked quality of all 3 Samples and removed cells with high mitochondrial expression (> 15%) and with to many counts (> median + 3 Standard Deviations), so that we filtered from 3772 to `r length(obj_integr$seurat_clusters)` cells. Filtering out low count cells was done by cellranger.
+
+```{r, echo=FALSE}
+VlnPlot(obj_integr, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"))
+FeatureScatter(obj_integr, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "orig.ident")
+```
+
+## Data Integration and Dimension Reduction
+
+We integrated the 3 datasets into one, reduced Dimension with PCA and visualized results with UMAP.
+
+```{r, echo=FALSE}
+# DimPlot(obj_integr, reduction = "umap", label = FALSE, group.by = "orig.ident") 
+```
+
+## Cell Cycle
+
+Cell cycle scoring showed moderate cell cycle effect, mostly of cycling Keratinocytes.
+
+```{r, echo=FALSE}
+DimPlot(obj_integr, reduction = "umap", label = FALSE, group.by = "Phase", raster = FALSE) 
+```
+# Clustering
+
+# Tabset {.tabset .tabset-fade .tabset-pills}
+
+## Unsupervised Louvain Clustering
+
+Graph-based Louvain-Clustering showed length(unique(obj_integr$seurat_clusters)) clusters.
+
+```{r clustering, echo=FALSE}
+p1 <- DimPlot(obj_integr, reduction = "umap", label = TRUE, repel = TRUE, group.by = "seurat_clusters", raster=FALSE) + theme(legend.position = "none")
+p2 <- ggplot(seurat_cluster_data, aes(x=Var1, y=Freq, fill=Var1)) +
+  geom_bar(stat="identity") + theme_minimal() + 
+  scale_fill_manual(values=seurat_colors) +
+  coord_flip() +
+  theme(
+    legend.position="none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+    ) +
+  xlab("Cluster") + ylab("Frequency") 
+
+p1 + p2
+```
+
+## Celltype Classification using a Reference Dataset
+
+We projected celltypes from Reynolds 2021 healthy scRNA-Seq dataset to our dataset and verified the this annotation further by examining some canonical celltype marker for specific skin celltype populations.
+
+```{r, echo=FALSE}
+
+Idents(obj_integr) <- "predicted.id.Cell_type_short"
+
+p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "predicted.id.Cell_type", cols = celltype_colors, raster = FALSE) +  theme(legend.position="none", legend.text=element_text(size=7)) + ggtitle("")
+
+p2 <- ggplot(celltype_cluster_data, aes(x=Var1, y=Freq, fill=Var1)) +
+  geom_bar(stat="identity") + theme_minimal() + 
+  scale_fill_manual(values=celltype_colors) +
+  coord_flip() +
+  theme(
+    legend.position="none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+    ) +
+  xlab("Celltype") + ylab("Frequency") 
+
+p1 + p2
+```
+
+### End tabset

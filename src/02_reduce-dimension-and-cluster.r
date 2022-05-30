@@ -3,15 +3,9 @@
 
 library(clustree)
 
-# for(i in seq_along(runs_list)){
-#   filename <- file.path(output_data_path,paste0(runs[i], "_seuratObj.RData"))
-#   load(file = filename)
-#   runs_list[[runs[i]]] <- seuratObj
-# }
-
 n_dims_use <- 30
 
-filename <- file.path(figures_path, "Dimension Reduction and Clustering.pdf")
+filename <- here(figures_path, "02_dimension-reduction-and-clustering.pdf")
 pdf(filename, 29.7/2.54, 21/2.54, useDingbats=FALSE)
 
 for(i in 1:length(runs_list)){
@@ -46,8 +40,8 @@ dev.off()
 
 
 for(i in seq_along(runs_list)){
-  seuratObj <- runs_list[[runs[i]]]
-  filename <- file.path(output_data_path,paste0(runs[i], "_seuratObj.RData"))
-  save(seuratObj, file = filename)
+  seurat_obj <- runs_list[[runs[i]]]
+  filename <- here(output_data_path,paste0(runs[i], "_seurat-obj.RData"))
+  save(seurat_obj, file = filename)
 }
-rm(seuratObj)
+rm(seurat_obj)
