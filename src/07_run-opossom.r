@@ -29,12 +29,17 @@ env <- opossom.new(list(
 env$indata <- GetAssayData(obj_mel_ds, slot = "scale.data", assay = "integrated") %>%
   as.matrix()
 env$group.labels <- paste("Melanocyte", obj_mel_ds$integrated_snn_res.1, sep = "_")
-env$group.colors <- obj_mel_ds$integrated_snn_res.1 %>%
+env$group.colors <- env$group.labels %>%
   n_distinct() %>%
   pals::glasbey()
+names(env$group.colors) <- unique(env$group.labels) %>%
+  sort()
+env$group.colors <- env$group.colors[match(env$group.labels, names(env$group.colors))]
+names(env$group.colors) <- names(env$group.labels)
 ord <- order(env$group.labels)
 env$indata <- env$indata[, ord]
 env$group.labels <- env$group.labels[ord]
 env$group.colors <- env$group.colors[ord]
 rm(obj_mel_ds)
 opossom.run(env)
+
