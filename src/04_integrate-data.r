@@ -4,7 +4,7 @@ source(here("src", "make-nicknames-for-celltypes.r"))
 
 runs_to_integrate <- c(
   "s1_LE479_NM_T", "LE489KG_Rep", "LE493BR_Rep", "LE497NA_Rep", "LE497ST_Rep", "LE-501-DM_Rep",
-  "LE-511-MW", "LE_569_HH", "LE_579_DE", "LE-583-KM", "LE-585-HM", "LE-597-EG_GEX", "LE-595-SV_GEX,",
+  "LE-511-MW", "LE_569_HH", "LE_579_DE", "LE-583-KM", "LE-585-HM", "LE-597-EG_GEX", "LE-595-SV_GEX",
   "LE-593-KP_RNAseq"
 )
 integr_anchors_reference <- c("LE-583-KM", "LE-585-HM") %in% runs_to_integrate
