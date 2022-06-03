@@ -9,7 +9,7 @@ obj_mel_ds <- subset(obj_mel, downsample = 300) %>%
   ScaleData(verbose = FALSE, features = rownames(obj_mel))
 rm(obj_mel)
 env <- opossom.new(list(
-  dataset.name = "2022-05-26-melanocytes",
+  dataset.name = paste(Sys.Date(), "melanocytes", sep = "_"),
   dim.1stLvlSom = "auto",
   dim.2ndLvlSom = "auto",
   activated.modules = list(
