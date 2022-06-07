@@ -3,6 +3,9 @@
 
 library(liana)
 source(here("src", "liana-functions.r"))
+filename <- here(output_data_path, "integrated-seurat-obj.RData")
+load(filename)
+
 
 Idents(obj_integr) <- "orig.ident"
 obj_naevus_neg <- subset(obj_integr, idents = "LE497NA_Rep", invert = TRUE)

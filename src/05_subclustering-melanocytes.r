@@ -3,6 +3,7 @@
 
 Idents(obj_integr) <- interesting_idents_long[1]
 obj_mel <- subset(obj_integr, idents = "Melanocyte")
+rm(obj_integr)
 
 obj_mel <- ScaleData(obj_mel, verbose = FALSE, features = rownames(obj_mel)) %>%
   RunPCA(npcs = n_dims_use, verbose = FALSE) %>%
