@@ -4,7 +4,7 @@
 
 # load packages and source code -------------------------------------------
 
-pacman::p_load(Seurat, tidyverse, here)
+pacman::p_load(Seurat, tidyverse)
 source(here("src","seurat-functions.r"))
 
 
@@ -25,16 +25,14 @@ paths <- list.dirs(input_data_path, full.names = FALSE)[-which(list.dirs(input_d
 
 # preprocess, filter and plot ---------------------------------------------
 
-# TODO check functions for functions of packages which need to be loaded!
-# TODO test functions
-# TODO insert section labels with strg+shift+R
-runs_list <- create_seurat_object(runs = runs, paths = paths, input_data_path = input_data_path)
-
-do_qc()
-
-runs_list <- do_filtering_and_qc(runs_list = runs_list, figures_path = figures_path)
-
+runs_list <- map2(runs, paths, ~create_seurat_object(
+                                                data_set_name = .x,
+                                                input_data_folder = .y,
+                                                input_data_path = input_data_path
+                                          )) %>%
+                                            map(~do_qc(seurat_object = .x, figures_path = figures_path)) %>%
+                                            map(~do_filtering_and_qc(seurat_object = .x, figures_path = figures_path))
 
 # save individual seurat objects ------------------------------------------
 
-save_seurat_objects(output_data_path = output_data_path, runs_list = runs_list)
+map(runs_list, ~save_seurat_objects(seurat_object = .x, output_data_path = output_data_path))
