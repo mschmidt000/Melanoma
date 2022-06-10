@@ -32,6 +32,7 @@ obj_integr <- ScaleData(obj_integr, verbose = FALSE, features = rownames(obj_int
   FindNeighbors(reduction = "pca", dims = 1:n_dims_use) %>%
   FindClusters(resolution = c(0.2, 0.4, 0.5, 0.6, 0.8, 1, 1.2))
 
+# TODO check nicknaming functions, check created nichnames
 obj_integr$predicted.id.Cell_type_nicknames <- make_nicknames(obj_integr$predicted.id.Cell_type)
 obj_integr$predicted.id.Cell_type <- factor(obj_integr$predicted.id.Cell_type, levels = sort(unique(obj_integr$predicted.id.Cell_type)))
 obj_integr$predicted.id.Cell_group <- factor(obj_integr$predicted.id.Cell_group, levels = sort(unique(obj_integr$predicted.id.Cell_group)))
