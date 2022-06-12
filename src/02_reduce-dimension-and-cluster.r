@@ -3,7 +3,7 @@
 
 # reduce dimension and plot -----------------------------------------------
 
-map(run_list, ~reduce_dimension_and_cluster(seurat_object = .x, figures_path = figures_path))
+map(runs_list, ~reduce_dimension_and_cluster(seurat_object = .x, figures_path = figures_path))
 
 
 # save individual seurat objects ------------------------------------------
