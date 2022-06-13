@@ -44,10 +44,14 @@ do_qc <- function(seurat_object = seurat_object, figures_path = figures_path){
   number_cells <- ncol(seurat_object@assays$RNA@data)
   mtext(paste0(name_run, " (", number_cells, ")"), side = 3, line = -2, cex = 3, at = -0.04, font = 3, adj = 0)
   print(VlnPlot(object = seurat_object, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rps")), main = name_run)
-  my_scatter <- ggplot(seurat_object@meta.data) +
+  p1 <- ggplot(seurat_object@meta.data) +
                   geom_point(aes(x = nCount_RNA, y = nFeature_RNA, colour = percent.mt)) +
                   scale_color_gradient(low = "black", high = "red")
-  my_scatter
+  print(p1)
+  p2 <- ggplot(seurat_object@meta.data) +
+    geom_point(aes(x = nCount_RNA, y = nFeature_RNA, colour = percent.rps)) +
+    scale_color_gradient(low = "black", high = "green")
+  print(p2)
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "nFeature_RNA" , group.by = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]))
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "percent.mt"))
   print(FeatureScatter(seurat_object, feature1 = "nFeature_RNA", feature2 = "percent.mt"))
@@ -62,8 +66,10 @@ do_qc <- function(seurat_object = seurat_object, figures_path = figures_path){
                    features = c("percent.mt", "percent.rps", "nCount_RNA", "nFeature_RNA")
   ))
   plot(DimPlot(seurat_object, reduction = "umap", label = TRUE, group.by = c("seurat_clusters")))
-  clustree(x = seurat_object@meta.data, prefix = "RNA_snn_res.") 
   plot(DimPlot(seurat_object, reduction = "umap", label = TRUE, group.by = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]))
+  
+  p3 <- VariableFeaturePlot(seurat_object)
+  p4 <- LabelPoints(plot = p3, points = head(VariableFeatures(seurat_object), 10), repel = TRUE)
   
   dev.off()
   gc()
@@ -99,16 +105,22 @@ do_filtering_and_qc <- function(seurat_object = seurat_object, figures_path = fi
   )
   
   # filtering out doublets
-  seurat_object <- subset(seurat_object, subset = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))] == "Singlet")
-
+  Idents(seurat_object) <- colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]
+  seurat_object <- subset(seurat_object, idents = "Singlet")
+  Idents(seurat_object) <- "seurat_clusters"
+  
   plot(0, type = "n", axes = FALSE, xlab = "", ylab = "", xlim = c(0, 1))
   number_cells <- ncol(seurat_object@assays$RNA@data)
   mtext(paste0(name_run, " (", number_cells, ")"), side = 3, line = -2, cex = 3, at = -0.04, font = 3, adj = 0)
-  print(VlnPlot(object = seurat_object, features = c("nFeature_RNA", "nCount_RNA", "percent.mt")), main = name_run)
-  my_scatter <- ggplot(seurat_object@meta.data) +
+  print(VlnPlot(object = seurat_object, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rps")), main = name_run)
+  p1 <- ggplot(seurat_object@meta.data) +
     geom_point(aes(x = nCount_RNA, y = nFeature_RNA, colour = percent.mt)) +
     scale_color_gradient(low = "black", high = "red")
-  my_scatter
+  print(p1)
+  p2 <- ggplot(seurat_object@meta.data) +
+    geom_point(aes(x = nCount_RNA, y = nFeature_RNA, colour = percent.rps)) +
+    scale_color_gradient(low = "black", high = "green")
+  print(p2)
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "nFeature_RNA", group.by = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]))
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "percent.mt"))
   print(FeatureScatter(seurat_object, feature1 = "nFeature_RNA", feature2 = "percent.mt"))
@@ -123,15 +135,14 @@ do_filtering_and_qc <- function(seurat_object = seurat_object, figures_path = fi
                    features = c("percent.mt", "percent.rps", "nCount_RNA", "nFeature_RNA")
   ))
   plot(DimPlot(seurat_object, reduction = "umap", label = TRUE, group.by = c("seurat_clusters")))
-  clustree(x = seurat_object@meta.data, prefix = "RNA_snn_res.") 
   plot(DimPlot(seurat_object, reduction = "umap", label = TRUE, group.by = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]))
   
   seurat_object <- NormalizeData(seurat_object) %>%
     FindVariableFeatures(do.plot = T, verbose = F) %>%
     ScaleData()
-  plot1 <- VariableFeaturePlot(seurat_object)
-  plot2 <- LabelPoints(plot = plot1, points = head(VariableFeatures(seurat_object), 10), repel = TRUE)
-  pplot2 + ggtitle(name_run)
+  p3 <- VariableFeaturePlot(seurat_object)
+  p4 <- LabelPoints(plot = p3, points = head(VariableFeatures(seurat_object), 10), repel = TRUE)
+  print(p4)
   
   dev.off()
   gc()
@@ -139,12 +150,12 @@ do_filtering_and_qc <- function(seurat_object = seurat_object, figures_path = fi
     
 }
 
-#' Save seurat object in list
+#' Save seurat object
 #'
 #' @param seurat_object seurat object
 #' @param output_data_path character vector of output data path
 #' @return seurat_object
-save_seurat_objects <- function(seurat_object = seurat_object, output_data_path = output_data_path){
+save_seurat_object <- function(seurat_object = seurat_object, output_data_path = output_data_path){
     
     name_run <- unique(seurat_object$orig.ident)
     filename <- here(output_data_path, paste0(name_run, "_seurat-obj.RData"))
@@ -153,6 +164,22 @@ save_seurat_objects <- function(seurat_object = seurat_object, output_data_path 
     
     NULL
 }
+
+#' Save seurat object in list
+#'
+#' @param seurat_object seurat object
+#' @param output_data_path character vector of output data path
+#' @return seurat_object
+save_seurat_object <- function(seurat_object = seurat_object, output_data_path = output_data_path){
+  
+  name_run <- unique(seurat_object$orig.ident)
+  filename <- here(output_data_path, paste0(name_run, "_seurat-obj.RData"))
+  save(seurat_object, file = filename)
+  gc()
+  
+  NULL
+}
+
 
 #' Finds doublets
 #'
@@ -179,6 +206,7 @@ find_doublets <- function(seurat_object = seurat_object){
                       FindVariableFeatures() %>%
                       ScaleData() %>%
                       RunPCA() %>%
+                      RunUMAP(dims = 1:n_dims_use) %>%
                       FindNeighbors(dims = 1:n_dims_use) %>%
                       FindClusters(resolution = 1.2)
   
