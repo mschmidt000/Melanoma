@@ -44,6 +44,10 @@ do_qc <- function(seurat_object = seurat_object, figures_path = figures_path){
   number_cells <- ncol(seurat_object@assays$RNA@data)
   mtext(paste0(name_run, " (", number_cells, ")"), side = 3, line = -2, cex = 3, at = -0.04, font = 3, adj = 0)
   print(VlnPlot(object = seurat_object, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rps")), main = name_run)
+  my_scatter <- ggplot(seurat_object@meta.data) +
+                  geom_point(aes(x = nCount_RNA, y = nFeature_RNA, colour = percent.mt)) +
+                  scale_color_gradient(low = "black", high = "red")
+  my_scatter
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "nFeature_RNA" , group.by = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]))
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "percent.mt"))
   print(FeatureScatter(seurat_object, feature1 = "nFeature_RNA", feature2 = "percent.mt"))
@@ -101,6 +105,10 @@ do_filtering_and_qc <- function(seurat_object = seurat_object, figures_path = fi
   number_cells <- ncol(seurat_object@assays$RNA@data)
   mtext(paste0(name_run, " (", number_cells, ")"), side = 3, line = -2, cex = 3, at = -0.04, font = 3, adj = 0)
   print(VlnPlot(object = seurat_object, features = c("nFeature_RNA", "nCount_RNA", "percent.mt")), main = name_run)
+  my_scatter <- ggplot(seurat_object@meta.data) +
+    geom_point(aes(x = nCount_RNA, y = nFeature_RNA, colour = percent.mt)) +
+    scale_color_gradient(low = "black", high = "red")
+  my_scatter
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "nFeature_RNA", group.by = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]))
   print(FeatureScatter(seurat_object, feature1 = "nCount_RNA", feature2 = "percent.mt"))
   print(FeatureScatter(seurat_object, feature1 = "nFeature_RNA", feature2 = "percent.mt"))
