@@ -165,19 +165,17 @@ save_seurat_object <- function(seurat_object = seurat_object, output_data_path =
     NULL
 }
 
-#' Save seurat object in list
+#' Load seurat object
 #'
-#' @param seurat_object seurat object
+#' @param data_set_name name of to dataset to load
 #' @param output_data_path character vector of output data path
 #' @return seurat_object
-save_seurat_object <- function(seurat_object = seurat_object, output_data_path = output_data_path){
+load_seurat_object <- function(data_set_name = data_set_name, output_data_path = output_data_path){
   
-  name_run <- unique(seurat_object$orig.ident)
-  filename <- here(output_data_path, paste0(name_run, "_seurat-obj.RData"))
-  save(seurat_object, file = filename)
-  gc()
+  filename <- here(output_data_path, paste0(data_set_name, "_seurat-obj.RData"))
+  load(filename)
   
-  NULL
+  seurat_object
 }
 
 
