@@ -20,19 +20,21 @@ output_data_path <- file.path("output")
 figures_path <- file.path("figs")
 literature_path <- "literature"
 
-paths <- list.dirs(input_data_path, full.names = FALSE)[-which(list.dirs(input_data_path, full.names = FALSE) %in% "")]
+paths <- list.files(input_data_path, full.names = FALSE)
 
 
 # preprocess, filter and plot ---------------------------------------------
+for(i in seq_along(runs)){
+  seurat_object <- create_seurat_object(  
+                      data_set_name = runs[i],
+                      input_data_folder = paths[i],
+                      input_data_path = input_data_path
+                ) %>%
+                do_qc(figures_path = figures_path)  %>%
+                do_filtering_and_qc(figures_path = figures_path)
+              
+  save_seurat_object(seurat_object, output_data_path = output_data_path)
+  rm(seurat_object)
+}
 
-runs_list <- map2(runs, paths, ~create_seurat_object(
-                                                data_set_name = .x,
-                                                input_data_folder = .y,
-                                                input_data_path = input_data_path
-                                          )) %>%
-                                            map(~do_qc(seurat_object = .x, figures_path = figures_path)) %>%
-                                            map(~do_filtering_and_qc(seurat_object = .x, figures_path = figures_path))
 
-# save individual seurat objects ------------------------------------------
-
-map(runs_list, ~save_seurat_objects(seurat_object = .x, output_data_path = output_data_path))
