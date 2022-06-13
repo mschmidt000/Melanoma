@@ -8,10 +8,12 @@ create_seurat_object <- function(data_set_name = data_set_name, input_data_folde
   
     pacman::p_load(Seurat, tidyverse, here)
   
-    seurat_object <- ReadMtx(
-      mtx = here(input_data_path, input_data_folder, "matrix.mtx.gz"), features = here(input_data_path, input_data_folder, "features.tsv.gz"),
-      cells = here(input_data_path, input_data_folder, "barcodes.tsv.gz")
-    )
+    # seurat_object <- ReadMtx(
+    #   mtx = here(input_data_path, input_data_folder, "matrix.mtx.gz"), features = here(input_data_path, input_data_folder, "features.tsv.gz"),
+    #   cells = here(input_data_path, input_data_folder, "barcodes.tsv.gz")
+    # )
+    
+    seurat_object <- load_and_remove_ambient(seurat_object, data_set_name, input_data_folder, input_data_path)
     colnames(seurat_object) <- paste(data_set_name, colnames(seurat_object), sep = "_")
     
     seurat_object <- CreateSeuratObject(counts = as.matrix(seurat_object), min.cells = 1, min.features = 3)
@@ -19,8 +21,9 @@ create_seurat_object <- function(data_set_name = data_set_name, input_data_folde
     seurat_object[["percent.rps"]] <- PercentageFeatureSet(seurat_object, pattern = "^RPS")
     seurat_object@meta.data$orig.ident <- data_set_name
     seurat_object <- find_doublets(seurat_object)
+    gc()
     seurat_object
-  
+   
 }
 
 
@@ -59,7 +62,7 @@ do_qc <- function(seurat_object = seurat_object, figures_path = figures_path){
   plot(DimPlot(seurat_object, reduction = "umap", label = TRUE, group.by = colnames(seurat_object@meta.data)[grep("DF.class",colnames(seurat_object@meta.data))]))
   
   dev.off()
- 
+  gc()
   seurat_object
   
 }
@@ -123,7 +126,7 @@ do_filtering_and_qc <- function(seurat_object = seurat_object, figures_path = fi
   pplot2 + ggtitle(name_run)
   
   dev.off()
-  
+  gc()
   seurat_object
     
 }
@@ -138,7 +141,9 @@ save_seurat_objects <- function(seurat_object = seurat_object, output_data_path 
     name_run <- unique(seurat_object$orig.ident)
     filename <- here(output_data_path, paste0(name_run, "_seurat-obj.RData"))
     save(seurat_object, file = filename)
-
+    gc()
+    
+    NULL
 }
 
 #' Finds doublets
@@ -162,9 +167,12 @@ find_doublets <- function(seurat_object = seurat_object){
   
   perplexity <- sqrt(ncol(seurat_object@assays$RNA@counts))
   seurat_object <- seurat_object %>%
-  RunPCA(features = VariableFeatures(seurat_object)) %>%
-  FindNeighbors(dims = 1:n_dims_use) %>%
-  FindClusters(resolution = 1.2)
+                      NormalizeData() %>%
+                      FindVariableFeatures() %>%
+                      ScaleData() %>%
+                      RunPCA() %>%
+                      FindNeighbors(dims = 1:n_dims_use) %>%
+                      FindClusters(resolution = 1.2)
   
   sweep.res.list <- paramSweep_v3(seurat_object, PCs = 1:10, sct = FALSE)
   sweep.stat <- summarizeSweep(sweep.res.list, GT = FALSE)
@@ -189,6 +197,8 @@ find_doublets <- function(seurat_object = seurat_object){
     sct = FALSE
   ) 
   
+  gc()
+  
   seurat_object
   
 }
@@ -201,16 +211,20 @@ find_doublets <- function(seurat_object = seurat_object){
 #' @param input_data_folder sequence of characters representing the individual input data folder name
 #' @param input_data_path character vector of general input data path
 #' @return filtered data matrix
-remove_ambient_expression <- function(seurat_object = seurat_object, data_set_name = data_set_name, input_data_folder = input_data_folder, input_data_path = input_data_path){
+load_and_remove_ambient <- function(seurat_object = seurat_object, data_set_name = data_set_name, input_data_folder = input_data_folder, input_data_path = input_data_path){
   
   pacman::p_load(Seurat, here, SoupX)
+  clusters <- read_csv(here(input_data_path, input_data_folder, "graphclust", "clusters.csv"), col_types = cols(Cluster = col_character()) )
+  clusters <- pull(clusters, Cluster)
+  toc <- Read10X(here(input_data_path, input_data_folder, "filtered_feature_bc_matrix"))
+  tod <- Read10X(here(input_data_path, input_data_folder, "raw_feature_bc_matrix"))
+  sc <- SoupChannel(tod, toc)
+  sc <- setClusters(sc,clusters)
+  sc <- autoEstCont(sc)
+  out <- adjustCounts(sc)
   
-  toc = GetAssayData(seurat_object, slot = "counts")
-  tod = Read10X(here(input_data_folder, input_data_path, "raw_gene_bc_matrices"))
-  sc = SoupChannel(tod, toc)
-  sc = setClusters(sc,seurat_object$seurat_clusters)
-  sc = autoEstCont(sc)
-  out = adjustCounts(sc)
+  gc()
+  out
 
 }
 
@@ -260,6 +274,8 @@ reduce_dimension_and_cluster <- function(seurat_object = seurat_object, figures_
 
 
   dev.off()
+  
+  gc()
   
   seurat_object
   
