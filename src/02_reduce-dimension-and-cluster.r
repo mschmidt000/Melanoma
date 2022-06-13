@@ -3,9 +3,11 @@
 
 # reduce dimension and plot -----------------------------------------------
 
-map(runs_list, ~reduce_dimension_and_cluster(seurat_object = .x, figures_path = figures_path))
+for(i in seq_along(runs)){
+  seurat_object <- load_seurat_object(data_set_name = runs[i],  output_data_path = output_data_path) %>%
+                    reduce_dimension_and_cluster(figures_path = figures_path)
+  
+  save_seurat_objects(seurat_object = seurat_object, output_data_path = output_data_path)
+  rm(seurat_object)
+}
 
-
-# save individual seurat objects ------------------------------------------
-
-map(runs_list, ~save_seurat_objects(seurat_object = .x, output_data_path = output_data_path))
