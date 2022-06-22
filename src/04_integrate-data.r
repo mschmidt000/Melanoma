@@ -9,16 +9,11 @@ runs_to_integrate <- c(
 )
 integr_anchors_reference <- c("LE-583-KM", "LE-585-HM") %in% runs_to_integrate
 
-runs_list_subset <- sapply(runs_to_integrate, function(x) {
-  runs_list[[x]]
-})
-rm(runs_list)
-integr_features <- sapply(runs_list_subset, function(x) {
-  rownames(x)
-})
+runs_list <- map(runs_to_integrate, ~load_seurat_object(data_set_name = .x,  output_data_path = output_data_path))
 integr_features <- Reduce(intersect, integr_features)
-integr_anchors <- FindIntegrationAnchors(runs_list_subset, dims = 1:30, reference = integr_anchors_reference, anchor.features = integr_features)
-rm(runs_list_subset)
+integr_anchors <- FindIntegrationAnchors(runs_list, dims = 1:30, reference = integr_anchors_reference, anchor.features = integr_features)
+rm(runs_list)
+
 obj_integr <- IntegrateData(anchorset = integr_anchors, dims = 1:30)
 DefaultAssay(obj_integr) <- "integrated"
 filename <- here(output_data_path, "integrated-seurat-obj.RData")
@@ -32,7 +27,6 @@ obj_integr <- ScaleData(obj_integr, verbose = FALSE, features = rownames(obj_int
   FindNeighbors(reduction = "pca", dims = 1:n_dims_use) %>%
   FindClusters(resolution = c(0.2, 0.4, 0.5, 0.6, 0.8, 1, 1.2))
 
-# TODO check nicknaming functions, check created nichnames
 obj_integr$predicted.id.Cell_type_nicknames <- make_nicknames(obj_integr$predicted.id.Cell_type)
 obj_integr$predicted.id.Cell_type <- factor(obj_integr$predicted.id.Cell_type, levels = sort(unique(obj_integr$predicted.id.Cell_type)))
 obj_integr$predicted.id.Cell_group <- factor(obj_integr$predicted.id.Cell_group, levels = sort(unique(obj_integr$predicted.id.Cell_group)))
