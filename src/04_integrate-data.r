@@ -3,15 +3,16 @@
 source(here("src", "make-nicknames-for-celltypes.r"))
 
 runs_to_integrate <- c(
-  "s1_LE479_NM_T", "LE489KG_Rep", "LE493BR_Rep", "LE497NA_Rep", "LE497ST_Rep", "LE-501-DM_Rep",
-  "LE-511-MW", "LE_569_HH", "LE_579_DE", "LE-583-KM", "LE-585-HM", "LE-597-EG_GEX", "LE-595-SV_GEX",
-  "LE-593-KP_RNAseq"
-)
-integr_anchors_reference <- c("LE-583-KM", "LE-585-HM") %in% runs_to_integrate
+  "LE493BR_Rep", "LE497NA_Rep", "LE497ST_Rep", "LE-501-DM_Rep",
+   "LE_579_DE", "LE-583-KM", "LE-585-HM", "LE-597-EG_GEX", "LE-595-SV_GEX",
+  "LE-593-KP_RNAseq", "LE-589-BE_RNAseq"
+) %>% sort()
 
 runs_list <- map(runs_to_integrate, ~load_seurat_object(data_set_name = .x,  output_data_path = output_data_path))
+integr_features <- map( runs_list, ~rownames(.))
 integr_features <- Reduce(intersect, integr_features)
-integr_anchors <- FindIntegrationAnchors(runs_list, dims = 1:30, reference = integr_anchors_reference, anchor.features = integr_features)
+integr_anchors <- FindIntegrationAnchors(runs_list, dims = 1:30, anchor.features = integr_features)
+
 rm(runs_list)
 
 obj_integr <- IntegrateData(anchorset = integr_anchors, dims = 1:30)
