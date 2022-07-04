@@ -2,6 +2,8 @@
 ### 20.05.22
 source(here("src", "make-nicknames-for-celltypes.r"))
 
+n_dims_use <- 30
+
 runs_to_integrate <- c(
   "LE493BR_Rep", "LE497NA_Rep", "LE497ST_Rep", "LE-501-DM_Rep",
    "LE_579_DE", "LE-583-KM", "LE-585-HM", "LE-597-EG_GEX", "LE-595-SV_GEX",
@@ -9,9 +11,11 @@ runs_to_integrate <- c(
 ) %>% sort()
 
 runs_list <- map(runs_to_integrate, ~load_seurat_object(data_set_name = .x,  output_data_path = output_data_path))
+names(runs_list) <- runs_to_integrate
 integr_features <- map( runs_list, ~rownames(.))
 integr_features <- Reduce(intersect, integr_features)
-integr_anchors <- FindIntegrationAnchors(runs_list, dims = 1:30, anchor.features = integr_features)
+reference <- which(names(runs_list) %in% c("LE-583-KM", "LE-585-HM"))
+integr_anchors <- FindIntegrationAnchors(runs_list, dims = 1:n_dims_use, reference = reference)
 
 rm(runs_list)
 
@@ -19,6 +23,7 @@ obj_integr <- IntegrateData(anchorset = integr_anchors, dims = 1:30)
 DefaultAssay(obj_integr) <- "integrated"
 filename <- here(output_data_path, "integrated-seurat-obj.RData")
 save(obj_integr, file = filename)
+DefaultAssay(obj_integr) <- "integrated"
 rm(integr_anchors)
 
 obj_integr <- ScaleData(obj_integr, verbose = FALSE, features = rownames(obj_integr)) %>%
