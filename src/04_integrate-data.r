@@ -46,7 +46,7 @@ interesting_idents_short <- c("Reynolds 21 Cell Type", "Reynolds 21 Cell Group",
 
 color_list <- list()
 for (i in interesting_idents_long) {
-  color_list[[i]] <- randomcoloR::distinctColorPalette(n_distinct(obj_integr@meta.data[, i]))
+  color_list[[i]] <- randomcoloR::distinctColorPalette(length(unique(na.omit(obj_integr@meta.data[, i]))))
   names(color_list[[i]]) <- levels(obj_integr@meta.data[, i])
 }
 filename <- here(output_data_path, "color-list.RData")
