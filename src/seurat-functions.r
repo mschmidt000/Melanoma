@@ -185,6 +185,7 @@ load_seurat_object <- function(data_set_name = data_set_name, output_data_path =
 #' @return filtered seurat object
 find_doublets <- function(seurat_object = seurat_object){
   
+  library(DoubletFinder)
   multiplet_rate_table <- tibble(rate = c(0.4, 0.8, 1.6, 2.3, 3.1, 3.9, 4.6, 5.4, 6.1, 6.9, 7.6),
                            cell_recovered_1 = c(500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000),
                            cell_recovered_2 = c(1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 1000000))
@@ -315,3 +316,61 @@ reduce_dimension_and_cluster <- function(seurat_object = seurat_object, figures_
   
 }
 
+
+
+#' Transfer cell annotation from reference data to query data with seurat
+#'
+#' @param seurat_object query object
+#' @param reference_object reference object
+#' @param figures_path character vector of output figures path
+#' @return seurat object
+transfer_labels <- function(seurat_object = seurat_object, reference_object = reference_object, figures_path = figures_path){
+    
+    n_dims_use <- 30
+    name_run <- unique(seurat_object$orig.ident)
+  
+    reynolds_predictions_exact <- list()
+  
+    my_anchors <- FindTransferAnchors(
+      reference = seurObj, query = seurat_object,
+      dims = 1:n_dims_use, reference.reduction = "pca"
+    )
+    
+    predictions <- TransferData(anchorset = my_anchors, refdata = seurObj$Cell_type, dims = 1:n_dims_use)
+    seurat_object$predicted.id.Cell_type <- predictions$predicted.id
+    seurat_object <- AddMetaData(seurat_object, metadata = predictions)
+    
+    predictions <- TransferData(anchorset = my_anchors, refdata = seurObj$Cell_group, dims = 1:n_dims_use)
+    seurat_object$predicted.id.Cell_group <- predictions$predicted.id
+    reynolds_predictions_exact[["Cell_group"]] <- predictions
+    
+    predictions <- TransferData(anchorset = my_anchors, refdata = seurObj$Flow_gate, dims = 1:n_dims_use)
+    seurat_object$predicted.id.Flow_gate <- predictions$predicted.id
+    reynolds_predictions_exact[["Flow_gate"]] <- predictions
+  
+  
+    interesting_idents_long <- c("predicted.id.Cell_type", "predicted.id.Cell_group", "predicted.id.Flow_gate")
+    interesting_idents_short <- c("Reynolds 2021 Cell-Type", "Reynolds 2021 Cell-Group", "Reynolds 2021 Flow Gate")
+  
+    filename <- here(figures_path, paste("03", name_run, "cell-type-predictions.pdf", sep = "_"))
+    pdf(filename, height = 7, width = 14)
+    
+    for (i in seq_along(interesting_idents_long)) {
+      
+      plot(0, type = "n", axes = FALSE, xlab = "", ylab = "", xlim = c(0, 1))
+      mtext(name_run, side = 3, line = -2, cex = 3, at = -0.04, font = 3, adj = 0)
+      my_title <- paste0("UMAP colored by ", interesting_idents_short[i], " (", name_run, ")")
+      my_palette <- pals::polychrome(length(unique(seurat_object@meta.data[, interesting_idents_long[i]])))
+      names(my_palette) <- sort(unique(seurat_object@meta.data[, interesting_idents_long[i]]))
+      print(DimPlot(seurat_object, reduction = "umap", label = TRUE, cols = my_palette, group.by = interesting_idents_long[i], pt.size = 1, repel = TRUE) + ggtitle(my_title))
+      par(mar = c(10, 5, 4, 5))
+      my_title <- paste0("Number of Cells per Cluster (", interesting_idents_short[i], ", ", name_run, ")")
+      print(barplot(table(seurat_object@meta.data[, interesting_idents_long[i]]), las = 2, main = my_title, col = my_palette[names(table(seurat_object@meta.data[, interesting_idents_long[i]]))]))
+    
+    }
+    
+    dev.off()
+    
+    seurat_object
+  
+}
