@@ -332,19 +332,19 @@ transfer_labels <- function(seurat_object = seurat_object, reference_object = re
     reynolds_predictions_exact <- list()
   
     my_anchors <- FindTransferAnchors(
-      reference = seurObj, query = seurat_object,
+      reference = reference_object, query = seurat_object,
       dims = 1:n_dims_use, reference.reduction = "pca"
     )
     
-    predictions <- TransferData(anchorset = my_anchors, refdata = seurObj$Cell_type, dims = 1:n_dims_use)
+    predictions <- TransferData(anchorset = my_anchors, refdata = reference_object$Cell_type, dims = 1:n_dims_use)
     seurat_object$predicted.id.Cell_type <- predictions$predicted.id
     seurat_object <- AddMetaData(seurat_object, metadata = predictions)
     
-    predictions <- TransferData(anchorset = my_anchors, refdata = seurObj$Cell_group, dims = 1:n_dims_use)
+    predictions <- TransferData(anchorset = my_anchors, refdata = reference_object$Cell_group, dims = 1:n_dims_use)
     seurat_object$predicted.id.Cell_group <- predictions$predicted.id
     reynolds_predictions_exact[["Cell_group"]] <- predictions
     
-    predictions <- TransferData(anchorset = my_anchors, refdata = seurObj$Flow_gate, dims = 1:n_dims_use)
+    predictions <- TransferData(anchorset = my_anchors, refdata = reference_object$Flow_gate, dims = 1:n_dims_use)
     seurat_object$predicted.id.Flow_gate <- predictions$predicted.id
     reynolds_predictions_exact[["Flow_gate"]] <- predictions
   
