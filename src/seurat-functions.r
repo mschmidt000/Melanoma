@@ -8,12 +8,12 @@ create_seurat_object <- function(data_set_name = data_set_name, input_data_folde
   
     pacman::p_load(Seurat, tidyverse, here)
   
-    # seurat_object <- ReadMtx(
-    #   mtx = here(input_data_path, input_data_folder, "matrix.mtx.gz"), features = here(input_data_path, input_data_folder, "features.tsv.gz"),
-    #   cells = here(input_data_path, input_data_folder, "barcodes.tsv.gz")
-    # )
-    
-    seurat_object <- load_and_remove_ambient(seurat_object, data_set_name, input_data_folder, input_data_path)
+    seurat_object <- ReadMtx(
+      mtx = here(input_data_path, input_data_folder, "filtered_feature_bc_matrix", "matrix.mtx.gz"), features = here(input_data_path, input_data_folder, "filtered_feature_bc_matrix", "features.tsv.gz"),
+      cells = here(input_data_path, input_data_folder,"filtered_feature_bc_matrix", "barcodes.tsv.gz")
+    )
+  
+    # seurat_object <- load_and_remove_ambient(seurat_object, data_set_name, input_data_folder, input_data_path)
     colnames(seurat_object) <- paste(data_set_name, colnames(seurat_object), sep = "_")
     
     seurat_object <- CreateSeuratObject(counts = as.matrix(seurat_object), min.cells = 1, min.features = 3)
