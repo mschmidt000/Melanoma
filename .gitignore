@@ -1,6 +1,7 @@
 .Rproj.user
 .Rhistory
 *.RData
+*.rds
 .Ruserdata
 data/**
 figs/**
@@ -11,4 +12,5 @@ output/**
 renv/**
 *.pdf
 *.html
+*.pptx
 omnipathr-log/**

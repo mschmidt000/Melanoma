@@ -3,11 +3,9 @@ title: "Analysis report of melanoma scRNA-Seq data"
 author: "Maria Schmidt"
 affiliation: "IZBI, Interdisciplinary Centre for Bioinformatics, Leipzig University, Germany"
 date: "`r Sys.Date()`"
-output: 
-  html_document:
-    toc: true
-    number_sections: false
+output: powerpoint_presentation
 link-citations: true
+bibliography: "library.bib"
 ---
 
 ```{r setup, include=FALSE}
@@ -15,98 +13,554 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
 ```{r libraries and load data}
-library(Seurat)
-library(tidyverse)
-library(ggplot2)
-library(pals)
+pacman::p_load(Seurat, tidyverse, here, ggplot2, pals, patchwork, flextable)
+source(here("src","seurat-functions.r"))
+source(here("src","liana-functions.r"))
+source(here("src","paths.r"))
 
-output_data_path <- file.path("output")
-
-filename <- file.path(output_data_path, "integrated_seuratObj.RData")
+filename <- file.path(output_data_path, "integrated-seurat-obj.RData")
 load(filename)
-filename <- file.path(output_data_path, "color_list.RData")
+filename <- file.path(output_data_path, "color-list.RData")
 load(filename)   
 seurat_colors <- scales::hue_pal()(length(table(obj_integr@meta.data[, "seurat_clusters"])))
-seurat_cluster_data <- data.frame(
-    table(obj_integr@meta.data[, "seurat_clusters"]),
-    "color" = seurat_colors
+# seurat_cluster_data <- data.frame(
+#     table(obj_integr@meta.data[, "seurat_clusters"]),
+#     "color" = seurat_colors
+# )
+celltype_colors <- color_list[["predicted.id.Cell_type_nicknames"]]
+# celltype_cluster_data <- data.frame(
+#     table(obj_integr@meta.data[, "predicted.id.Cell_type_nicknames"]),
+#     "color" = celltype_colors
+# )
+# filename <- here(output_data_path, "predicted.id.Cell_type_nicknames_marker.RData")
+# load(filename)
+filename <- here(output_data_path, "reynolds-skin-marker.RData")
+load(filename) 
+# filename <- here(output_data_path, "integrated-liana-obj.RData")
+# load(filename)
+filename <- here(literature_path, "tsoi.marker.list.RData")
+load(filename)
+filename <- here(literature_path, "belote.list.RData")
+load(filename) 
+
+```
+
+# Preprocessing, data integration and dimension reduction
+
+## Quality check
+
+We did quality check of all Samples. We removed cells with high mitochondrial expression and less counts/genes by thresholding.
+
+* nFeature_RNA = number of features per cell
+* nCount_RNA = number of counts per cell
+* percent.mt = fraction of mitochondrial expression per cell
+* percent.rps = fraction of ribosomal expression
+
+"Quality control is performed to ensure that the data quality is sufficient for downstream analysis. As “sufficient data quality” cannot be determined a priori, it is judged based on downstream analysis performance (e.g., cluster annotation). Thus, it may be necessary to revisit quality control decisions multiple times when analysing the data. Often it is beneficial to start with permissive QC thresholds and investigate the effects of these thresholds before going back to perform more stringent QC. This approach is particularly relevant for datasets containing heterogeneous cell populations where cell types or states may be misinterpreted as low-quality outlier cells." (@luecken2019current)
+
+```{r, echo=FALSE,  fig.width = 35, fig.height = 11}
+p1 <- VlnPlot(obj_integr, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), group.by = "predicted.id.Cell_type_nicknames", cols = celltype_colors)
+p2 <- VlnPlot(obj_integr, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), group.by = "seurat_clusters")
+p3 <- VlnPlot(obj_integr, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), group.by = "orig.ident", cols = pals::glasbey(length(unique(obj_integr$orig.ident))))
+
+p1 / p2 / p3
+```
+
+Mitochondrial expression is mainly associated with:
+
+* unsupervised clusters: 25, 30, 32, 4 and 13
+* supervised classification: Th, Mast cells and Melanocytes
+* experiments: LE-509-SV_GEX and LE-597-EG_GEX
+
+High expression levels of mitochondrial genes could be an indicator of:
+
+* Poor sample quality, leading to a high fraction of apoptotic or lysing cells.
+* Biology of the particular sample, for example, tumor biopsies, may have increased mitochondrial gene expression due to metabolic activity and/or necrosis.
+
+[... see 10X homepage](https://kb.10xgenomics.com/hc/en-us/articles/360001086611-Why-do-I-see-a-high-level-of-mitochondrial-gene-expression-)
+
+```{r, echo=FALSE,  fig.width = 12, fig.height = 5}
+p1 <- FeatureScatter(obj_integr, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "orig.ident", cols = pals::glasbey(length(unique(obj_integr$orig.ident))))
+p2 <- ggplot(obj_integr@meta.data) +
+    geom_point(aes(x = nCount_RNA, y = nFeature_RNA, colour = percent.mt)) +
+    theme_minimal()
+
+p1 | p2
+```
+
+
+
+```{r, echo=FALSE,  fig.width = 7, fig.height = 7}
+ft <- continuous_summary(
+  obj_integr@meta.data,
+  columns = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rps"),
+  by = "orig.ident",
+  hide_grouplabel = TRUE,
+  digits = 0
 )
-celltype_colors <- color_list[["predicted.id.Cell_type"]]
-celltype_cluster_data <- data.frame(
-    table(obj_integr@meta.data[, "predicted.id.Cell_type"]),
-    "color" = celltype_colors
+ft <-  set_caption(ft, caption = "Statistics of number of counts, features, mitochondrial expression and ribosomal expression per experiment")
+ft <- add_footer_lines(ft, "nFeature_RNA = number of features per cell, nCount_RNA = number of counts per cell, percent.mt = fraction of mitochondrial expression per cell, percent.rps = fraction of ribosomal expression per cell")
+```
+
+## Data integration and dimension reduction
+
+To account for biases due to batch effects, we integrated the ` length(unique(obj_integr$orig.ident)) ` data sets into one. We performed dimension reduction utilizing PCA and visualized the integrated data set with the UMAP method, which showed good sample mixing and compact clusters independent from the batches.
+
+```{r, echo=FALSE,  fig.width = 10, fig.height = 5}
+p1 <- DimPlot(obj_integr, reduction = "umap", label = FALSE, group.by = "orig.ident", cols = pals::glasbey(length(unique(obj_integr$orig.ident)))) + theme(legend.position="none")
+p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = factor(1), fill = orig.ident)) +
+  geom_bar() +
+  coord_polar(theta = "y") + 
+  theme_void() +
+  scale_fill_manual(values = pals::glasbey(length(unique(obj_integr$orig.ident))))
+
+p <- p1 + p2 + plot_layout(ncol=2,widths=c(3,1))
+p <- p + plot_annotation(
+  title = 'Distribution of cells among experiments',
+  tag_levels = 'A',
+  caption = 'A: UMAP of all cells, B: Pie chart of distribution of cells among experiments'
+)
+p
+
+```
+
+## Cell-cycle scoring
+
+We assigned each cell a cell-cycle score, based on its expression of G2/M and S phase markers and predicted classification of each cell in either G2M, S or G1 phase. 
+
+```{r}
+p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "Phase", cols = RColorBrewer::brewer.pal(length(unique(obj_integr$Tsoi_classification)), "Set1")) + theme(legend.position = "none") + ggtitle("")
+
+p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = factor(1), fill = Phase)) +
+  geom_bar() +
+  coord_polar(theta = "y") + 
+  theme_void() +
+  scale_fill_brewer(palette="Set1") 
+
+p <- p1 + p2 + plot_layout(ncol=2,widths=c(3,1))
+p <- p + plot_annotation(
+  title = 'Classification of cells into cell-cycle-based classes',
+  tag_levels = 'A',
+  caption = 'A: UMAP of all cells, B: Pie chart of distribution of cell-cycle-based classes in melanocytes'
+)
+p
+
+p1 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = seurat_clusters, fill = Phase)) +
+  geom_bar() + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1")  +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = seurat_clusters, fill = Phase)) +
+  geom_bar(position = "fill") + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p <- p1 / p2
+
+p + plot_annotation(
+  title = 'Distribution of cell-cycle-based classes among seurat clusters in melanocytes',
+  tag_levels = 'A',
+  caption = 'A: absolute, B: proportion'
 )
 
+p1 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = orig.ident, fill = Phase)) +
+  geom_bar() + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 20, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = orig.ident, fill = Phase)) +
+  geom_bar(position = "fill") + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 20, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p <- p1 / p2
+
+p + plot_annotation(
+  title = 'Distribution of cell-cycle-based classes among experiments',
+  tag_levels = 'A',
+  caption = 'A: absolute, B: proportion, NEVUS: LE497NA_Rep'
+)
+
+
 ```
 
-## Preprocessing and Quality Check
 
-We checked quality of all 3 Samples and removed cells with high mitochondrial expression (> 15%) and with to many counts (> median + 3 Standard Deviations), so that we filtered from 3772 to `r length(obj_integr$seurat_clusters)` cells. Filtering out low count cells was done by cellranger.
+## Unsupervised clustering
 
-```{r, echo=FALSE}
-VlnPlot(obj_integr, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"))
-FeatureScatter(obj_integr, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "orig.ident")
-```
+To cluster cell in an unsupervised fashion, we applied the graph-based leiden algorithm implemented in the Seurat package.
 
-## Data Integration and Dimension Reduction
-
-We integrated the 3 datasets into one, reduced Dimension with PCA and visualized results with UMAP.
-
-```{r, echo=FALSE}
-# DimPlot(obj_integr, reduction = "umap", label = FALSE, group.by = "orig.ident") 
-```
-
-## Cell Cycle
-
-Cell cycle scoring showed moderate cell cycle effect, mostly of cycling Keratinocytes.
-
-```{r, echo=FALSE}
-DimPlot(obj_integr, reduction = "umap", label = FALSE, group.by = "Phase", raster = FALSE) 
-```
-# Clustering
-
-# Tabset {.tabset .tabset-fade .tabset-pills}
-
-## Unsupervised Louvain Clustering
-
-Graph-based Louvain-Clustering showed length(unique(obj_integr$seurat_clusters)) clusters.
-
-```{r clustering, echo=FALSE}
-p1 <- DimPlot(obj_integr, reduction = "umap", label = TRUE, repel = TRUE, group.by = "seurat_clusters", raster=FALSE) + theme(legend.position = "none")
-p2 <- ggplot(seurat_cluster_data, aes(x=Var1, y=Freq, fill=Var1)) +
-  geom_bar(stat="identity") + theme_minimal() + 
-  scale_fill_manual(values=seurat_colors) +
+```{r, echo=FALSE,  fig.width = 12, fig.height = 8}
+p1 <- DimPlot(obj_integr, reduction = "umap", label = TRUE, repel = TRUE, group.by = "seurat_clusters") + theme(legend.position = "none")
+p2 <- ggplot(obj_integr@meta.data, aes(y = seurat_clusters, fill = seurat_clusters)) +
+  geom_bar() +
+  theme_minimal() +
+  scale_fill_manual(values = seurat_colors) +
   coord_flip() +
   theme(
-    legend.position="none",
-    axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
-    ) +
-  xlab("Cluster") + ylab("Frequency") 
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
 
-p1 + p2
-```
-
-## Celltype Classification using a Reference Dataset
-
-We projected celltypes from Reynolds 2021 healthy scRNA-Seq dataset to our dataset and verified the this annotation further by examining some canonical celltype marker for specific skin celltype populations.
-
-```{r, echo=FALSE}
-
-Idents(obj_integr) <- "predicted.id.Cell_type_short"
-
-p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "predicted.id.Cell_type", cols = celltype_colors, raster = FALSE) +  theme(legend.position="none", legend.text=element_text(size=7)) + ggtitle("")
-
-p2 <- ggplot(celltype_cluster_data, aes(x=Var1, y=Freq, fill=Var1)) +
-  geom_bar(stat="identity") + theme_minimal() + 
-  scale_fill_manual(values=celltype_colors) +
+p3 <- ggplot(obj_integr@meta.data, aes(x = factor(1), fill = seurat_clusters)) +
+  geom_bar(position = "fill") +
+  theme_minimal() +
+  coord_polar(theta = "y") + 
+  facet_wrap(orig.ident ~ .) +
+  scale_fill_manual(values = seurat_colors) +
   coord_flip() +
   theme(
-    legend.position="none",
-    axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
-    ) +
-  xlab("Celltype") + ylab("Frequency") 
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Celltype") +
+  ylab("Frequency")
 
-p1 + p2
+
+p <- (p1 + p2) / p3 + plot_layout(nrow=2,heights=c(2,1))
+
+p + plot_annotation(
+  title = 'Graph-based clustering',
+  tag_levels = 'A',
+  caption = 'A: UMAP colored by seurat clusters, B: Distribution of cells among seurat clusters, C: Distribution of cells among seurat clusters per experiment'
+)
 ```
 
-### End tabset
+
+## Celltype classification using a reference dataset
+
+We projected celltypes from a healthy scRNA-Seq dataset (@Reynolds2021) onto our dataset.
+
+```{r, echo=FALSE,  fig.width = 12, fig.height = 8}
+
+Idents(obj_integr) <- "predicted.id.Cell_type_nicknames"
+
+p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "predicted.id.Cell_type_nicknames", cols = celltype_colors) + theme(legend.position = "none", legend.text = element_text(size = 7)) + ggtitle("")
+
+p2 <- ggplot(obj_integr@meta.data, aes(y = predicted.id.Cell_type_nicknames, fill = predicted.id.Cell_type_nicknames)) +
+  geom_bar() +
+  theme_minimal() +
+  scale_fill_manual(values = celltype_colors) +
+  coord_flip() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Celltype") +
+  ylab("Frequency")
+
+p3 <- ggplot(obj_integr@meta.data, aes(x = factor(1), fill = predicted.id.Cell_type_nicknames)) +
+  geom_bar(position = "fill") +
+  theme_minimal() +
+  coord_polar(theta = "y") + 
+  facet_wrap(orig.ident ~ .) +
+  scale_fill_manual(values = celltype_colors) +
+  coord_flip() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Celltype") +
+  ylab("Frequency")
+
+
+p <- (p1 + p2) / p3 + plot_layout(nrow=2,heights=c(3,1))
+
+p + plot_annotation(
+  title = 'Cell types projected from Reynolds et al., 2021',
+  tag_levels = 'A',
+  caption = 'A: UMAP colored by cell types, B: Distribution of cells among cell types, C: Distribution of cells among cell types per experiment'
+)
+
+```
+
+
+To verify our projected cell types further, we examined some cell type markers for the specific skin and immune cell populations.
+
+```{r, echo=FALSE, fig.align = "center", fig.height = 10, fig.width = 15 }
+DotPlot(obj_integr, features = skin_marker, group.by = "predicted.id.Cell_type_nicknames", dot.scale = 6) +
+  scale_color_gradient2(high = "red", low = "blue") +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10)
+  )
+
+
+# DotPlot(obj_integr, features = skin_marker, group.by = "annotated_seurat_clusters.Cell_type_nicknames", dot.scale = 6) +
+#   scale_color_gradient2(high = "red", low = "blue") +
+#   theme(
+#     axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10)
+#   )
+
+```
+It seems that there are some melanocytes labelled as 'mast cells', this melanocytes show high expression of *APOD*
+
+```{r, echo=FALSE,  fig.width = 10, fig.height = 5}
+
+mels <- rownames(obj_integr@meta.data)[which(obj_integr@meta.data[, "predicted.id.Cell_type_nicknames"] %in% c("Melanocyte", "Mast cell"))]
+
+Idents(obj_integr) <- "predicted.id.Cell_type_nicknames"
+
+p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "predicted.id.Cell_type_nicknames", cells = mels, cols = celltype_colors) +
+  theme(legend.position = "none") + ggtitle("")
+
+p2 <- FeaturePlot(obj_integr, features = "APOD", cells = mels) 
+
+p <- p1 + p2
+
+p + plot_annotation(
+  title = 'UMAP of melanocytes and mast cells',
+  tag_levels = 'A',
+  caption = 'A: UMAP colored by cell types, B: UMAP colored by APOD expression'
+)
+
+ 
+
+
+```
+# *AXL* and *MITF* expression
+
+```{r, echo=FALSE,  fig.width = 10, fig.height = 8}
+
+p1 <- FeaturePlot(obj_integr, features = c("AXL", "MITF"))
+p2 <- DotPlot(obj_integr, features = c("AXL", "MITF"), group.by = "predicted.id.Cell_type_nicknames") +
+  RotatedAxis() +
+  coord_flip() +
+  scale_color_gradient2(high = "red", low = "blue") +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10)
+  )
+
+
+p <- p1 / p2
+
+p + plot_annotation(
+  title = 'Gene expression',
+  tag_levels = 'A',
+  caption = 'A: UMAP colored by unscaled AXL log-expression, B: UMAP colored by unscaled MITF log-expression, C: Dotplot of scaled AXL and UMAP log-expression'
+)
+
+``` 
+
+
+
+
+# Melanoma differentiation
+
+## Tsoi et al., 2018 gene set expression
+
+```{r, echo=FALSE, fig.align = "center", fig.height = 15, fig.width = 20}
+
+FeaturePlot(obj_integr, features = grep("Tsoi", colnames(obj_integr@meta.data), value = TRUE)[-8])
+
+```
+
+## Belote et al., 2021 gene set expression
+
+```{r, echo=FALSE, fig.align = "center", fig.height = 22, fig.width = 20}
+
+# DefaultAssay(obj_integr) <- "RNA"
+# obj_integr <- AddModuleScore(obj_integr, features = belote.list, search = TRUE, name = paste("Belote",names(belote.list), sep = "_"))
+# DefaultAssay(obj_integr) <- "integrated"
+  
+FeaturePlot(obj_integr, features = grep("Belote", colnames(obj_integr@meta.data), value = TRUE))
+
+```
+
+
+```{r, echo=FALSE, fig.align = "center", fig.height = 12, fig.width = 15}
+
+DotPlot(obj_integr, features = grep("Belote", colnames(obj_integr@meta.data), value = TRUE), group.by = "predicted.id.Cell_type_nicknames") +
+  scale_color_gradient2(high = "red", low = "blue") +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
+  )
+
+ 
+```
+
+## Classification of melanocytes based on Tsoi gene set expression
+
+```{r, echo=FALSE, fig.align = "center", fig.height = 7, fig.width = 10}
+
+# obj_integr <- classify_cells(
+#   object = obj_integr,
+#   name = "Tsoi",
+#   set.ident = TRUE
+# )
+# obj_integr$Tsoi_classification <- factor(obj_integr$Tsoi_classification, levels = c("Tsoi_Undifferentiated", "Tsoi_Undifferentiated.Neural.crest.like", "Tsoi_Neural.crest.like", "Tsoi_Neural.crest.like.Transitory", "Tsoi_Transitory", "Tsoi_Transitory.Melanocytic", "Tsoi_Melanocytic", "No"))
+
+# obj_integr$Mel <- rep(FALSE, ncol(obj_integr))
+# obj_integr$Mel[grep("Melanocyte", obj_integr$predicted.id.Cell_type_nicknames)] <- TRUE
+# table(obj_integr$Mel)
+
+
+p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "Tsoi_classification", cols = RColorBrewer::brewer.pal(length(unique(obj_integr$Tsoi_classification)), "Set1")) + theme(legend.position = "none") + ggtitle("")
+
+p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = factor(1), fill = Tsoi_classification)) +
+  geom_bar() +
+  coord_polar(theta = "y") + 
+  theme_void() +
+  scale_fill_brewer(palette="Set1") 
+
+p <- p1 + p2 + plot_layout(ncol=2,widths=c(3,1))
+p <- p + plot_annotation(
+  title = 'Classification of cells into Tsoi-geneset-based classes',
+  tag_levels = 'A',
+  caption = 'A: UMAP of all cells, B: Pie chart of distribution of Tsoi-based classes in melanocytes'
+)
+p
+
+p1 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = seurat_clusters, fill = Tsoi_classification)) +
+  geom_bar() + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1")  +
+  theme(
+    # legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = seurat_clusters, fill = Tsoi_classification)) +
+  geom_bar(position = "fill") + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1") +
+  theme(
+    # legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p <- p1 / p2
+
+p + plot_annotation(
+  title = 'Distribution of Tsoi-based classes among seurat clusters in melanocytes',
+  tag_levels = 'A',
+  caption = 'A: absolute, B: proportion'
+)
+
+p1 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = orig.ident, fill = Tsoi_classification)) +
+  geom_bar() + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1") +
+  theme(
+    # legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = orig.ident, fill = Tsoi_classification)) +
+  geom_bar(position = "fill") + 
+  theme_minimal() +
+  scale_fill_brewer(palette="Set1") +
+  theme(
+    # legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+  ) +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+p <- p1 / p2
+
+p + plot_annotation(
+  title = 'Distribution of Tsoi-based classes among experiments',
+  tag_levels = 'A',
+  caption = 'A: absolute, B: proportion'
+)
+
+```
+
+## *AXL* and *MITF* expression among Tsoi classes
+
+```{r, echo=FALSE,  fig.width = 10, fig.height = 4}
+mel_idents <- unique(c(grep("Mel_", unique(obj_integr$`predicted.id.Cell_type_nicknames_mels_tsoi-classes`), value = TRUE), 
+                grep("Mast", unique(obj_integr$`predicted.id.Cell_type_nicknames_mels_tsoi-classes`), value = TRUE)))
+Idents(obj_integr) <- "predicted.id.Cell_type_nicknames_mels_tsoi-classes"
+DotPlot(obj_integr, features = c("AXL", "MITF"), group.by = "predicted.id.Cell_type_nicknames_mels_tsoi-classes", idents = mel_idents) +
+  RotatedAxis() +
+  coord_flip() +
+  scale_color_gradient2(high = "red", low = "blue") +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
+  )
+
+``` 
+
+<!-- We calculated positive markers via differential expression, which further verify and define our predicted clusters. -->
+
+<!-- ```{r, echo=FALSE, fig.align = "center", fig.height = 20, fig.width = 20 } -->
+<!-- Idents(obj_integr) <- "predicted.id.Cell_type_nicknames" -->
+<!-- cluster_marker <- FindAllMarkers(obj_integr, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25) -->
+<!-- save(cluster_marker, file = here(output_data_path, "predicted.id.Cell_type_nicknames_marker.RData")) -->
+<!-- top5_predicted.id.Cell_type <- cluster_marker %>% -->
+<!--   group_by(cluster) %>% -->
+<!--   top_n(n = 5, wt = avg_log2FC) -->
+<!-- DoHeatmap(obj_integr, features = top5_predicted.id.Cell_type$gene, group.by = "predicted.id.Cell_type_nicknames", group.bar.height = 0.03, group.colors = celltype_colors, hjust = 0) + -->
+<!--   xlab("Celltype") + -->
+<!--   ylab("Top 5 Marker per Cluster") + theme(legend.position = "none") + -->
+<!--   theme( -->
+<!--     axis.text.y = element_text(size = 15), -->
+<!--     axis.title = element_text(size = 30), -->
+<!--     axis.text.x = element_text(size = 25) -->
+<!--   )+ -->
+<!--   scale_fill_gradient2(high = "red", low = "blue") -->
+<!-- ``` -->
+
+# counts
+
+## melanoma cells per cell type and tsoi class
+
+```{r , echo=FALSE, fig.width=10, fig.height=10}
+nevus <- grep("LE497NA_Rep", obj_integr@meta.data[, "orig.ident"])
+obj_integr@meta.data[, "nevus"] <- FALSE
+obj_integr@meta.data[nevus, "nevus"] <- TRUE
+
+tab <- table(obj_integr@meta.data[-nevus,"predicted.id.Cell_type_nicknames"], obj_integr@meta.data[-nevus,"Tsoi_classification"])
+ft <- matrix(tab, nrow = nrow(tab), ncol = ncol(tab))
+ft <- data.frame(rownames(tab),ft)
+colnames(ft) <- c("Celltype",colnames(tab))
+
+ft <- flextable(ft)
+ft
+```
+
+
+## neavus cells per cell type and tsoi class
+
+```{r , echo=FALSE, fig.width=10, fig.height=10}
+tab_nevus <- table(obj_integr@meta.data[nevus,"predicted.id.Cell_type_nicknames"], obj_integr@meta.data[nevus,"Tsoi_classification"])
+ft <- matrix(tab_nevus, nrow = nrow(tab_nevus), ncol = ncol(tab_nevus))
+ft <- data.frame(rownames(tab_nevus),ft)
+colnames(ft) <- c("Celltype",colnames(tab_nevus))
+
+ft <- flextable(ft)
+ft
+```
+

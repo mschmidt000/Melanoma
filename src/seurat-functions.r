@@ -374,3 +374,73 @@ transfer_labels <- function(seurat_object = seurat_object, reference_object = re
     seurat_object
   
 }
+
+
+
+
+classify_cells <- function(
+  object,
+  name,
+  ctrl = NULL,
+  set.ident = FALSE,
+  ...
+) {
+  if (is.null(x = ctrl)) {
+    ctrl <- min(vapply(X = features, FUN = length, FUN.VALUE = numeric(length = 1)))
+  }
+  # object.cc <- AddModuleScore(
+  #   object = object,
+  #   features = features,
+  #   name = name,
+  #   ctrl = ctrl,
+  #   search = TRUE
+  # )
+  cc.columns <- grep(pattern = name, x = colnames(x = object[[]]), value = TRUE)
+  cc.scores <- object[[cc.columns]]
+  CheckGC()
+  assignments <- apply(
+    X = cc.scores,
+    MARGIN = 1,
+    FUN = function(scores, names_scores = names(scores)) {
+      if (all(scores < 0)) {
+        return("No")
+      } else {
+        if (length(which(x = scores == max(scores))) > 1) {
+          return('Undecided')
+        } else {
+          return(gsub('[[:digit:]]+', '',names_scores[which(x = scores == max(scores))]))
+        }
+      }
+    }
+  )
+  cc.scores_new <- merge(x = cc.scores, y = data.frame(assignments), by = 0)
+  colnames(x = cc.scores_new) <- c('rownames', colnames(cc.scores), paste(name, "classification", sep = "_"))
+  rownames(x = cc.scores_new) <- cc.scores_new$rownames
+  cc.scores_new <- cc.scores_new[, -1]
+  object[[colnames(cc.scores_new)]] <- cc.scores_new
+  if (set.ident) {
+    object[['old.ident']] <- Idents(object = object)
+    Idents(object = object) <- paste(name, "classification", sep = "_")
+  }
+  return(object)
+}
+
+annotate_clusters <- function(
+  object,
+  reference_clusters
+) {
+  tab <- table(object$seurat_clusters, object@meta.data[,reference_clusters])
+  CheckGC()
+  annotated_cluster <- apply(
+    X = tab,
+    MARGIN = 1,
+    FUN = function(cluster) {
+      if (all(cluster == 0)) {
+        return("No")
+      } else {
+          return(names(cluster)[which(x = cluster == max(cluster))])
+      }
+    }
+  )
+  return(annotated_cluster)
+}

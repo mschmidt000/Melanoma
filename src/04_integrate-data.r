@@ -1,5 +1,6 @@
 ### integrating good quality data sets
 ### 20.05.22
+library(clustree)
 source(here("src", "make-nicknames-for-celltypes.r"))
 
 n_dims_use <- 30
@@ -46,7 +47,7 @@ interesting_idents_short <- c("Reynolds 21 Cell Type", "Reynolds 21 Cell Group",
 
 color_list <- list()
 for (i in interesting_idents_long) {
-  color_list[[i]] <- randomcoloR::distinctColorPalette(length(unique(na.omit(obj_integr@meta.data[, i]))))
+  color_list[[i]] <- randomcoloR::distinctColorPalette(length(levels(obj_integr@meta.data[, i])))
   names(color_list[[i]]) <- levels(obj_integr@meta.data[, i])
 }
 filename <- here(output_data_path, "color-list.RData")
@@ -100,3 +101,7 @@ for (a in seq_along(levels(Idents(obj_integr)))) {
   }
 }
 dev.off()
+
+annotated_cluster <- annotate_clusters(obj_integr, "predicted.id.Cell_type_nicknames")
+obj_integr@meta.data[, "annotated_seurat_clusters.Cell_type_nicknames"] <- factor(annotated_cluster[match(obj_integr$seurat_clusters, names(annotated_cluster))], levels = c("KC premit", "KC postmit", "Melanocyte", "Fb 2", "Pericyte", "VE 3", "LE 1", "Tc", "Th", "Mast cell", "Mac 2", "Plasma cell", "DC2", "pDC"))
+

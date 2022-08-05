@@ -1,0 +1,261 @@
+---
+title: "Analysis report of melanoma scRNA-Seq data"
+author: "Maria Schmidt"
+affiliation: "IZBI, Interdisciplinary Centre for Bioinformatics, Leipzig University, Germany"
+date: "`r Sys.Date()`"
+output: powerpoint_presentation
+link-citations: true
+bibliography: "library.bib"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r libraries and load data}
+pacman::p_load(Seurat, tidyverse, here, ggplot2, pals, patchwork, flextable, liana)
+source(here("src","seurat-functions.r"))
+source(here("src","liana-functions.r"))
+source(here("src","paths.r"))
+
+filename <- file.path(output_data_path, "integrated-seurat-obj.RData")
+load(filename)
+filename <- file.path(output_data_path, "color-list.RData")
+load(filename)   
+seurat_colors <- scales::hue_pal()(length(table(obj_integr@meta.data[, "seurat_clusters"])))
+# seurat_cluster_data <- data.frame(
+#     table(obj_integr@meta.data[, "seurat_clusters"]),
+#     "color" = seurat_colors
+# )
+celltype_colors <- color_list[["predicted.id.Cell_type_nicknames"]]
+# celltype_cluster_data <- data.frame(
+#     table(obj_integr@meta.data[, "predicted.id.Cell_type_nicknames"]),
+#     "color" = celltype_colors
+# )
+# filename <- here(output_data_path, "predicted.id.Cell_type_nicknames_marker.RData")
+# load(filename)
+filename <- here(output_data_path, "reynolds-skin-marker.RData")
+load(filename) 
+filename <- here(output_data_path, "integrated-liana-obj-Cell_type_nicknames_nevus-marked.RData")
+load(filename)
+filename <- here(literature_path, "tsoi.marker.list.RData")
+load(filename)
+filename <- here(literature_path, "belote.list.RData")
+load(filename) 
+
+```
+
+# LIANA-analysis
+
+## communication frequency
+
+The plot visualizes the frequencies of significant interactions (p <= 0.01) for each pair of potentially communicating cell types from sender to receiver.
+
+```{r liana_freq, echo=FALSE, fig.width=20, fig.height=20}
+
+liana_obj %>%
+  filter(aggregate_rank <= 0.01) %>%
+  heat_freq()
+
+```
+
+
+```{r , echo=FALSE, fig.width=20, fig.height=20}
+dendritic <- grep("DC", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
+dendritic <- dendritic[-grep("nev", dendritic)]
+tcells <- c("Tc", "Th", "Treg")
+nkcells <- grep("NK", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
+lymphocytes <- c(tcells, nkcells, "Plasma cell" )
+macrophages <- grep("Mac", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
+macrophages <- macrophages[-grep("nev", macrophages)]
+langerhans <- grep("LC", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
+langerhans <- langerhans[-grep("nev", langerhans)]
+inflammatory <- sort(c(dendritic, tcells, macrophages, langerhans, "Mast cell", "Monocyte", "Plasma cell" ))
+mast <-  grep("Mast", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
+mast <- mast[-grep("nev", mast)]
+melanocytes <- grep("Mel_", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
+melanocytes <- melanocytes[-grep("nev", melanocytes)]
+mel_and_mast <- unique(c(mast, melanocytes))
+```
+
+## t cells -> melanocytes
+
+All significant immune-melanoma interactions with p <= 0.01. Sender region is on the left and receiver region on the right. For more information on LIANA see Dimitrov et al. 2022
+
+```{r , echo=FALSE, fig.width=20, fig.height=10}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  tcells) %>%
+  filter(target %in%  melanocytes) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = tcells,
+                      target_groups = melanocytes) %>% print()
+  }
+```
+
+## t cells -> melanocytes + mast cells
+
+```{r , echo=FALSE, fig.width=20, fig.height=10}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  tcells) %>%
+  filter(target %in%  mel_and_mast) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = tcells,
+                      target_groups = mel_and_mast) %>% print()
+  }
+```
+
+## melanocytes -> t cells
+
+```{r , echo=FALSE, fig.width=25, fig.height=15}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  melanocytes) %>%
+  filter(target %in%  tcells) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = melanocytes,
+                      target_groups = tcells) %>% print()
+  }
+```
+
+## melanocytes + mast cells -> t cells
+
+```{r , echo=FALSE, fig.width=25, fig.height=35}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  mel_and_mast) %>%
+  filter(target %in%  tcells) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = mel_and_mast,
+                      target_groups = tcells) %>% print()
+  }
+```
+
+
+
+
+
+
+## dendritic cells -> melanocytes
+
+```{r , echo=FALSE, fig.width=30, fig.height=20}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  dendritic) %>%
+  filter(target %in%  melanocytes) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = dendritic,
+                      target_groups = melanocytes) %>% print()
+  }
+```
+
+## dendritic cells -> melanocytes + mast cells
+
+```{r , echo=FALSE, fig.width=30, fig.height=20}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  dendritic) %>%
+  filter(target %in%  mel_and_mast) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = dendritic,
+                      target_groups = mel_and_mast) %>% print()
+  }
+```
+
+## melanocytes -> dendritic cells
+
+```{r , echo=FALSE, fig.width=30, fig.height=20}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  melanocytes) %>%
+  filter(target %in%  dendritic) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = melanocytes,
+                      target_groups = dendritic) %>% print()
+  }
+```
+
+## melanocytes + mast cells -> dendritic cells
+
+```{r , echo=FALSE, fig.width=30, fig.height=35}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  mel_and_mast) %>%
+  filter(target %in%  dendritic) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = mel_and_mast,
+                      target_groups = dendritic) %>% print()
+  }
+```
+
+
+
+## dendritic cells -> lymphocytes
+
+p <= 0.001
+
+```{r , echo=FALSE, fig.width=30, fig.height=20}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.001) %>%
+  filter(source %in%  dendritic) %>%
+  filter(target %in%  lymphocytes) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = dendritic,
+                      target_groups = lymphocytes) %>% print()
+  }
+```
+
+
+## lymphocytes -> dendritic cells
+
+```{r , echo=FALSE, fig.width=25, fig.height=20}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  lymphocytes) %>%
+  filter(target %in%  dendritic) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = lymphocytes,
+                      target_groups = dendritic) %>% print()
+  }
+```
