@@ -375,9 +375,12 @@ transfer_labels <- function(seurat_object = seurat_object, reference_object = re
   
 }
 
-
-
-
+#' Classify cells by Module Scores of a given Pattern
+#'
+#' @param seurat_object query object
+#' @param name pattern which is in the name of the gene sets / module scores
+#' @param set.ident setting idents by the created classification
+#' @return seurat object
 classify_cells <- function(
   object,
   name,
@@ -425,6 +428,11 @@ classify_cells <- function(
   return(object)
 }
 
+#' Annotate seurat clusters by reference clusters
+#'
+#' @param seurat_object query object
+#' @param reference_clusters reference clusters by which the seurat clusters will be annotated
+#' @return seurat object
 annotate_clusters <- function(
   object,
   reference_clusters
