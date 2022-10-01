@@ -2,18 +2,26 @@
 title: "Analysis report of melanoma scRNA-Seq data"
 author: "Maria Schmidt"
 affiliation: "IZBI, Interdisciplinary Centre for Bioinformatics, Leipzig University, Germany"
-date: "`r Sys.Date()`"
-output: powerpoint_presentation
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
+  pptx: default
+  pdf: default
+execute: 
+  echo: true
+  error: false
+  warning: false
 link-citations: true
 bibliography: "library.bib"
+embed-resources: true
+
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
-```
-
 ```{r libraries and load data}
-pacman::p_load(Seurat, tidyverse, here, ggplot2, pals, patchwork, flextable)
+pacman::p_load(Seurat, tidyverse, here, ggplot2, pals, patchwork)
 source(here("src","seurat-functions.r"))
 source(here("src","liana-functions.r"))
 source(here("src","paths.r"))
