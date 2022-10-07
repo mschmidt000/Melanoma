@@ -14,3 +14,4 @@ renv/**
 *.html
 *.pptx
 omnipathr-log/**
+.vscode/**
