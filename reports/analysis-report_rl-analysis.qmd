@@ -84,8 +84,8 @@ langerhans <- langerhans[-grep("nev", langerhans)]
 inflammatory <- sort(c(dendritic, tcells, macrophages, langerhans, "Mast cell", "Monocyte", "Plasma cell" ))
 mast <-  grep("Mast", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
 mast <- mast[-grep("nev", mast)]
-melanocytes <- grep("Mel_", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
-melanocytes <- melanocytes[-grep("nev", melanocytes)]
+melanocytes_nev <- grep("Mel_", unique(obj_integr@meta.data[,"predicted.id.Cell_type_nicknames_mels_tsoi-classes_nevus_marked"]), value = TRUE)
+melanocytes <- melanocytes_nev[-grep("nev", melanocytes_nev)]
 mel_and_mast <- unique(c(mast, melanocytes))
 ```
 
@@ -211,6 +211,23 @@ liana_subset <- liana_obj %>%
   if (nrow(liana_subset) > 0) {
     my_liana_dotplot2(liana_subset,
                       source_groups = melanocytes,
+                      target_groups = dendritic) %>% print()
+  }
+```
+
+## melanocytes + nev -> dendritic cells
+
+```{r , echo=FALSE, fig.width=30, fig.height=20}
+
+liana_subset <- liana_obj %>%
+  filter(aggregate_rank < 0.01) %>%
+  filter(source %in%  melanocytes_nev) %>%
+  filter(target %in%  dendritic) 
+  
+  
+  if (nrow(liana_subset) > 0) {
+    my_liana_dotplot2(liana_subset,
+                      source_groups = melanocytes_nev,
                       target_groups = dendritic) %>% print()
   }
 ```

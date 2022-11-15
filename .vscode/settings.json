@@ -1,3 +1,4 @@
 {
-    "quarto.path": ".local/bin/quarto"
+    "quarto.path": "",
+    "quarto.render.previewReveal": false
 }

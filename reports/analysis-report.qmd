@@ -139,6 +139,9 @@ We assigned each cell a cell-cycle score, based on its expression of G2/M and S 
 ```{r}
 p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "Phase", cols = RColorBrewer::brewer.pal(length(unique(obj_integr$Tsoi_classification)), "Set1")) + theme(legend.position = "none") + ggtitle("")
 
+# DimPlot(obj_integr, reduction = "umap", label = FALSE, raster = FALSE, repel = TRUE, cols = RColorBrewer::brewer.pal(length(unique(obj_integr$Tsoi_classification)), "Set1"), group.by = "Phase", split.by = "orig.ident", ncol = 4) + theme(legend.position = "none")
+
+
 p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = factor(1), fill = Phase)) +
   geom_bar() +
   coord_polar(theta = "y") + 
@@ -222,7 +225,7 @@ p + plot_annotation(
 To cluster cell in an unsupervised fashion, we applied the graph-based leiden algorithm implemented in the Seurat package.
 
 ```{r, echo=FALSE,  fig.width = 12, fig.height = 8}
-p1 <- DimPlot(obj_integr, reduction = "umap", label = TRUE, repel = TRUE, group.by = "seurat_clusters") + theme(legend.position = "none")
+p1 <- DimPlot(obj_integr, reduction = "umap", label = TRUE, repel = TRUE, group.by = "seurat_clusters", split.by = "orig.ident", ncol = 4) + theme(legend.position = "none")
 p2 <- ggplot(obj_integr@meta.data, aes(y = seurat_clusters, fill = seurat_clusters)) +
   geom_bar() +
   theme_minimal() +
@@ -268,7 +271,7 @@ We projected celltypes from a healthy scRNA-Seq dataset (@Reynolds2021) onto our
 
 Idents(obj_integr) <- "predicted.id.Cell_type_nicknames"
 
-p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "predicted.id.Cell_type_nicknames", cols = celltype_colors) + theme(legend.position = "none", legend.text = element_text(size = 7)) + ggtitle("")
+p1 <- DimPlot(obj_integr, reduction = "umap", label = FALSE, label.box = TRUE,  repel = TRUE, group.by = "predicted.id.Cell_type_nicknames", cols = celltype_colors, raster = FALSE) + theme(legend.position = "none", legend.text = element_text(size = 7)) + ggtitle("")
 
 p2 <- ggplot(obj_integr@meta.data, aes(y = predicted.id.Cell_type_nicknames, fill = predicted.id.Cell_type_nicknames)) +
   geom_bar() +
@@ -415,6 +418,7 @@ DotPlot(obj_integr, features = grep("Belote", colnames(obj_integr@meta.data), va
 
 ```{r, echo=FALSE, fig.align = "center", fig.height = 7, fig.width = 10}
 
+
 # obj_integr <- classify_cells(
 #   object = obj_integr,
 #   name = "Tsoi",
@@ -422,14 +426,20 @@ DotPlot(obj_integr, features = grep("Belote", colnames(obj_integr@meta.data), va
 # )
 # obj_integr$Tsoi_classification <- factor(obj_integr$Tsoi_classification, levels = c("Tsoi_Undifferentiated", "Tsoi_Undifferentiated.Neural.crest.like", "Tsoi_Neural.crest.like", "Tsoi_Neural.crest.like.Transitory", "Tsoi_Transitory", "Tsoi_Transitory.Melanocytic", "Tsoi_Melanocytic", "No"))
 
-# obj_integr$Mel <- rep(FALSE, ncol(obj_integr))
-# obj_integr$Mel[grep("Melanocyte", obj_integr$predicted.id.Cell_type_nicknames)] <- TRUE
-# table(obj_integr$Mel)
+obj_integr$Mel <- rep(FALSE, ncol(obj_integr))
+obj_integr$Mel[grep("Melanocyte", obj_integr$predicted.id.Cell_type_nicknames)] <- TRUE
+table(obj_integr$Mel)
 
+obj_integr$Mel_seurat <- rep(FALSE, ncol(obj_integr))
+obj_integr$Mel_seurat[grep("Melanocyte", obj_integr$seurat_clusters_annotated)] <- TRUE
+obj_integr$Mel_seurat[grep("Mast", obj_integr$seurat_clusters_annotated)] <- TRUE
+table(obj_integr$Mel_seurat)
+
+mels_sub <- subset(obj_integr, Mel_seurat)
 
 p1 <- DimPlot(obj_integr, reduction = "umap", group.by = "Tsoi_classification", cols = RColorBrewer::brewer.pal(length(unique(obj_integr$Tsoi_classification)), "Set1")) + theme(legend.position = "none") + ggtitle("")
 
-p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = factor(1), fill = Tsoi_classification)) +
+p2 <- ggplot(mels_sub@meta.data, aes(x = factor(1), fill = Tsoi_classification)) +
   geom_bar() +
   coord_polar(theta = "y") + 
   theme_void() +
@@ -443,18 +453,18 @@ p <- p + plot_annotation(
 )
 p
 
-p1 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = seurat_clusters, fill = Tsoi_classification)) +
+p1 <- ggplot(mels_sub@meta.data, aes(x = seurat_clusters_annotated_sorted, fill = Tsoi_classification)) +
   geom_bar() + 
   theme_minimal() +
   scale_fill_brewer(palette="Set1")  +
   theme(
     # legend.position = "none",
-    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
   ) +
   xlab("Cluster") +
   ylab("Frequency")
 
-p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = seurat_clusters, fill = Tsoi_classification)) +
+p2 <- ggplot(mels_sub@meta.data, aes(x = seurat_clusters_annotated_sorted, fill = Tsoi_classification)) +
   geom_bar(position = "fill") + 
   theme_minimal() +
   scale_fill_brewer(palette="Set1") +
@@ -466,6 +476,7 @@ p2 <- ggplot(subset(obj_integr@meta.data, Mel), aes(x = seurat_clusters, fill = 
   ylab("Frequency")
 
 p <- p1 / p2
+p <- p + plot_layout(guides = 'collect')
 
 p + plot_annotation(
   title = 'Distribution of Tsoi-based classes among seurat clusters in melanocytes',

@@ -1,0 +1,39 @@
+---
+title: "RNA velocity analysis of melanoma data"
+author: "Maria Schmidt"
+affiliation: "IZBI, Interdisciplinary Centre for Bioinformatics, Leipzig University, Germany"
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
+  pptx: default
+  pdf: default
+execute: 
+  echo: true
+  error: false
+  warning: false
+link-citations: true
+bibliography: "library.bib"
+embed-resources: true
+params:
+  run: "LE-583-KM_Analyse_Cellranger"
+jupyter: python3
+---
+
+
+```{python}
+import pyprojroot as here
+import scvelo as scv
+my_file = [params$run, ".loom"]
+my_file = "".paste(my_file)
+path = ["home","sc.uni-leipzig", "mf263wwia", "Melanoma", "data", "LE-583-KM_Analyse_Cellranger" , "velocyto", file]
+adata = scv.read("/home/sc.uni-leipzig.de/mf263wwia/Melanoma/data/LE-583-KM_Analyse_Cellranger/velocyto/LE-583-KM_Analyse_Cellranger.loom", cache=True)
+
+
+```
+
+# LIANA-analysis
+
+## communication frequency
